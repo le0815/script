@@ -32,7 +32,7 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
     }
 
     # 4. Trích xuất TẤT CẢ các cột
-    col_pattern = re.compile(r'\[(\w+)\]\s*\[(\w+)\](\s*\([0-9\s,]+\))?\s*(NOT\s+NULL|NULL)?', re.IGNORECASE)
+    col_pattern = re.compile(r'\[(\w+)\]\s*\[(\w+)\](\s*\([0-9\s,a-zA-Z]+\))?\s*(NOT\s+NULL|NULL)?', re.IGNORECASE)
     
     columns =[]
     for match in col_pattern.finditer(sql_core):
@@ -42,8 +42,21 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
         col_constraints = match.group(4) if match.group(4) else ""
         
         doris_type = type_mapping.get(col_type, col_type)
+        
+        # ---------- LOGIC XỬ LÝ SIZE ĐẶC BIỆT ----------
         if col_type == 'uniqueidentifier':
             col_size = "" 
+        elif col_type == 'nvarchar' and col_size:
+            # Tìm con số trong chuỗi kích thước (VD: "(20)" -> lấy 20)
+            num_match = re.search(r'\d+', col_size)
+            if num_match:
+                new_len = int(num_match.group()) * 3
+                col_size = f"({new_len})"
+            elif 'max' in col_size.lower():
+                # Xử lý trường hợp nvarchar(max)
+                doris_type = 'string'
+                col_size = ""
+        # -----------------------------------------------
             
         full_type = f"{doris_type}{col_size}"
         is_not_null = "NOT NULL" if "NOT NULL" in col_constraints.upper() else "NULL"
@@ -58,7 +71,7 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
         return "Lỗi: Không tìm thấy khai báo cột nào."
 
     # 5. Sắp xếp lại thứ tự cột cho Apache Doris
-    priority_cols = ['DATAAREAID', 'RECID', 'RECVERSION']
+    priority_cols =['DATAAREAID', 'RECID', 'RECVERSION']
     sorted_columns =[]
     
     for pc in priority_cols:
@@ -73,7 +86,6 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
     # 6. Build chuỗi câu lệnh cho Apache Doris
     doris_sql =[]
     
-    # THÊM 2 DÒNG THỐNG KÊ SỐ LƯỢNG CỘT TẠI ĐÂY
     doris_sql.append(f"-- sql totals column: {len(columns)}")
     doris_sql.append(f"-- doris totals column: {len(sorted_columns)}")
     
@@ -99,102 +111,14 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
 # TEST VỚI DỮ LIỆU ĐẦU VÀO CỦA BẠN
 # ==========================================
 sql_server_script = """
-CREATE TABLE [dbo].[INVENTLOCATION](
-	[ACTIVITYTYPE_RU] [nvarchar](30) NOT NULL,
-	[ALLOWLABORSTANDARDS] [int] NOT NULL,
-	[ALLOWMARKINGRESERVATIONREMOVAL] [int] NOT NULL,
-	[BRANCHNUMBER] [nvarchar](13) NOT NULL,
-	[CONSOLIDATESHIPATRTW] [int] NOT NULL,
-	[CUSTACCOUNT_BR] [nvarchar](20) NOT NULL,
-	[CUSTACCOUNT_HU] [nvarchar](20) NOT NULL,
-	[CYCLECOUNTALLOWPALLETMOVE] [int] NOT NULL,
-	[DECREMENTLOADLINE] [int] NOT NULL,
-	[DEFAULTKANBANFINISHEDGOODSLOCATION] [nvarchar](20) NOT NULL,
-	[DEFAULTPRODUCTIONFINISHGOODSLOCATION] [nvarchar](20) NOT NULL,
-	[DEFAULTSHIPMAINTENANCELOC] [nvarchar](20) NOT NULL,
-	[DEFAULTSTATUSID] [nvarchar](10) NOT NULL,
-	[EMPTYPALLETLOCATION] [nvarchar](10) NOT NULL,
-	[FSHSTORE] [int] NOT NULL,
-	[INVENTCOUNTINGGROUP_BR] [int] NOT NULL,
-	[INVENTLOCATIONID] [nvarchar](10) NOT NULL,
-	[INVENTLOCATIONIDGOODSINROUTE_RU] [nvarchar](10) NOT NULL,
-	[INVENTLOCATIONIDQUARANTINE] [nvarchar](10) NOT NULL,
-	[INVENTLOCATIONIDREQMAIN] [nvarchar](10) NOT NULL,
-	[INVENTLOCATIONIDTRANSIT] [nvarchar](10) NOT NULL,
-	[INVENTLOCATIONLEVEL] [int] NOT NULL,
-	[INVENTLOCATIONTYPE] [int] NOT NULL,
-	[INVENTPROFILEID_RU] [nvarchar](10) NOT NULL,
-	[INVENTPROFILETYPE_RU] [int] NOT NULL,
-	[INVENTSITEID] [nvarchar](10) NOT NULL,
-	[MANUAL] [int] NOT NULL,
-	[MAXPICKINGROUTETIME] [int] NOT NULL,
-	[MAXPICKINGROUTEVOLUME] [numeric](32, 6) NOT NULL,
-	[NAME] [nvarchar](100) NOT NULL,
-	[NUMBERSEQUENCEGROUP_RU] [nvarchar](10) NOT NULL,
-	[PICKINGLINETIME] [int] NOT NULL,
-	[PRINTBOLBEFORESHIPCONFIRM] [int] NOT NULL,
-	[PRODRESERVEONLYWHSE] [int] NOT NULL,
-	[RBODEFAULTINVENTPROFILEID_RU] [nvarchar](10) NOT NULL,
-	[RBODEFAULTWMSLOCATIONID] [nvarchar](20) NOT NULL,
-	[RBODEFAULTWMSPALLETID] [nvarchar](18) NOT NULL,
-	[REMOVEINVENTBLOCKINGONSTATUSCHANGE] [int] NOT NULL,
-	[REQCALENDARID] [nvarchar](10) NOT NULL,
-	[REQREFILL] [int] NOT NULL,
-	[RESERVEATLOADPOST] [int] NOT NULL,
-	[RETAILINVENTNEGFINANCIAL] [int] NOT NULL,
-	[RETAILINVENTNEGPHYSICAL] [int] NOT NULL,
-	[RETAILWEIGHTEX1] [numeric](32, 6) NOT NULL,
-	[RETAILWMSLOCATIONIDDEFAULTRETURN] [nvarchar](20) NOT NULL,
-	[RETAILWMSPALLETIDDEFAULTRETURN] [nvarchar](18) NOT NULL,
-	[UNIQUECHECKDIGITS] [int] NOT NULL,
-	[USEWMSORDERS] [int] NOT NULL,
-	[VENDACCOUNT] [nvarchar](20) NOT NULL,
-	[VENDACCOUNTCUSTOM_RU] [nvarchar](20) NOT NULL,
-	[WHSENABLED] [int] NOT NULL,
-	[WHSRAWMATERIALPOLICY] [int] NOT NULL,
-	[WMSAISLENAMEACTIVE] [int] NOT NULL,
-	[WMSLEVELFORMAT] [nvarchar](10) NOT NULL,
-	[WMSLEVELNAMEACTIVE] [int] NOT NULL,
-	[WMSLOCATIONIDDEFAULTISSUE] [nvarchar](20) NOT NULL,
-	[WMSLOCATIONIDDEFAULTRECEIPT] [nvarchar](20) NOT NULL,
-	[WMSLOCATIONIDGOODSINROUTE_RU] [nvarchar](20) NOT NULL,
-	[WMSPOSITIONFORMAT] [nvarchar](10) NOT NULL,
-	[WMSPOSITIONNAMEACTIVE] [int] NOT NULL,
-	[WMSRACKFORMAT] [nvarchar](10) NOT NULL,
-	[WMSRACKNAMEACTIVE] [int] NOT NULL,
-	[WAREHOUSEAUTORELEASERESERVATION] [int] NOT NULL,
-	[DEFAULTPRODUCTIONINPUTLOCATION] [nvarchar](20) NOT NULL,
-	[DEFAULTRETURNCREDITONLYLOCATION] [nvarchar](20) NOT NULL,
-	[DEFAULTCONTAINERTYPECODE] [nvarchar](20) NOT NULL,
-	[RELEASETOWAREHOUSERULE] [int] NOT NULL,
-	[WORKPROCESSINGPOLICYNAME] [nvarchar](60) NOT NULL,
-	[AUTOUPDATESHIPMENT] [int] NOT NULL,
-	[DEFAULTQUALITYMAINTENANCELOCATION] [nvarchar](20) NOT NULL,
-	[ENABLEQUALITYMANAGEMENT] [int] NOT NULL,
-	[LOADRELEASERESERVATIONPOLICY] [int] NOT NULL,
-	[REJECTORDERFULFILLMENT] [nvarchar](10) NOT NULL,
-	[ITMINVENTLOCATIONIDUNDER] [nvarchar](10) NOT NULL,
-	[ITMINVENTLOCATIONIDGIT] [nvarchar](10) NOT NULL,
-	[DATAAREAID] [nvarchar](4) NOT NULL,
-	[PARTITION] [bigint] NOT NULL,
-	[RECID] [bigint] NOT NULL,
-	[RECVERSION] [int] NOT NULL,
-	[MODIFIEDDATETIME] [datetime] NOT NULL,
-	[MODIFIEDBY] [nvarchar](20) NOT NULL,
-	[CREATEDDATETIME] [datetime] NOT NULL,
-	[CREATEDBY] [nvarchar](20) NOT NULL,
-	[GFT_WAREHOUSETYPE] [int] NOT NULL,
-	[GDS_ISCALCSTOCK] [int] NOT NULL,
-	[GDS_NOTJOINMOKITTINGCALC] [int] NOT NULL,
-	[GFT_APPRVALDEPTID] [nvarchar](50) NOT NULL,
-	[GDS_ABANDONEDWAREHOUSE] [int] NOT NULL,
-	[GFT_ISCKPOSTNUMSAME] [int] NOT NULL,
-	[GFT_INVENTLOCATION_TYPE] [int] NOT NULL,
- CONSTRAINT [I_23753INVENTLOCATIONIDX] PRIMARY KEY CLUSTERED 
+CREATE TABLE[dbo].[DLVREASON](
+	[CODE][nvarchar](10) NOT NULL,[TXT] [nvarchar](200) NOT NULL,[FREE_IT][int] NOT NULL,
+	[INVOICEACCOUNT_IT] [nvarchar](20) NOT NULL,[PAYMTERMID_IT] [nvarchar](100) NOT NULL,[DATAAREAID][nvarchar](4) NOT NULL,
+	[PARTITION] [bigint] NOT NULL,[RECID] [bigint] NOT NULL,
+	[RECVERSION] [int] NOT NULL,[GDS_INVENTLOCATIONID] [nvarchar](10) NOT NULL,
+ CONSTRAINT[I_1494CODEIDX] PRIMARY KEY CLUSTERED 
 (
-	[PARTITION] ASC,
-	[DATAAREAID] ASC,
-	[INVENTLOCATIONID] ASC
+	[PARTITION] ASC,[DATAAREAID] ASC,
 )
 """
 
