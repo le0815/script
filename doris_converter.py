@@ -111,14 +111,32 @@ def convert_sqlserver_to_doris(sql_text, table_prefix="D365_"):
 # TEST VỚI DỮ LIỆU ĐẦU VÀO CỦA BẠN
 # ==========================================
 sql_server_script = """
-CREATE TABLE[dbo].[DLVREASON](
-	[CODE][nvarchar](10) NOT NULL,[TXT] [nvarchar](200) NOT NULL,[FREE_IT][int] NOT NULL,
-	[INVOICEACCOUNT_IT] [nvarchar](20) NOT NULL,[PAYMTERMID_IT] [nvarchar](100) NOT NULL,[DATAAREAID][nvarchar](4) NOT NULL,
-	[PARTITION] [bigint] NOT NULL,[RECID] [bigint] NOT NULL,
-	[RECVERSION] [int] NOT NULL,[GDS_INVENTLOCATIONID] [nvarchar](10) NOT NULL,
- CONSTRAINT[I_1494CODEIDX] PRIMARY KEY CLUSTERED 
+CREATE TABLE [dbo].[PRODTABLEJOUR](
+	[ADJUSTMENT] [numeric](32, 6) NOT NULL,
+	[AMOUNTFINANCIAL] [numeric](32, 6) NOT NULL,
+	[AMOUNTFINANCIALSECCUR_RU] [numeric](32, 6) NOT NULL,
+	[AMOUNTPHYSICAL] [numeric](32, 6) NOT NULL,
+	[CANCELED] [int] NOT NULL,
+	[INVENTTRANSID] [nvarchar](20) NOT NULL,
+	[ITEMID] [nvarchar](20) NOT NULL,
+	[JOURNALTYPE] [int] NOT NULL,
+	[OPENPRODORDER] [int] NOT NULL,
+	[PDSCWBATCHERR] [numeric](32, 6) NOT NULL,
+	[PDSCWBATCHGOOD] [numeric](32, 6) NOT NULL,
+	[PRODID] [nvarchar](20) NOT NULL,
+	[QTYERROR] [numeric](32, 6) NOT NULL,
+	[QTYGOOD] [numeric](32, 6) NOT NULL,
+	[SCRAPVOUCHER] [nvarchar](20) NOT NULL,
+	[TRANSDATE] [datetime] NOT NULL,
+	[VOUCHER] [nvarchar](20) NOT NULL,
+	[DATAAREAID] [nvarchar](4) NOT NULL,
+	[PARTITION] [bigint] NOT NULL,
+	[RECID] [bigint] NOT NULL,
+	[RECVERSION] [int] NOT NULL,
+	[MODIFIEDDATETIME] [datetime] NOT NULL,
+ CONSTRAINT [I_15850RECID] PRIMARY KEY CLUSTERED 
 (
-	[PARTITION] ASC,[DATAAREAID] ASC,
+	[RECID] ASC
 )
 """
 
